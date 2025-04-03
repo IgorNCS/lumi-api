@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
+  Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -11,10 +12,8 @@ export enum Role {
   ADMIN = 'admin',
   COSTUMER = 'costumer',
 }
+@Entity()
 export class User {
-  // nCliente
-  // 3001116735
-
   @PrimaryGeneratedColumn('uuid')
   @ApiProperty({ example: 'e7d3c6c4-3b6d-4e7a-9eae-64c93f9f7f4f' })
   id: string;
