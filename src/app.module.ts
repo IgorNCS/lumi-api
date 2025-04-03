@@ -6,19 +6,13 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { ClsModule } from 'nestjs-cls';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
-    AuthModule,
-    ClsModule.forRoot({
-      global: true,
-      middleware: { mount: true },
-      interceptor: { mount: false },
-    }),
     ConfigModule.forRoot({
-    isGlobal: true,
-  }),
-    KeycloakModule,
+      isGlobal: true,
+    }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.POSTGRES_HOST,
@@ -32,6 +26,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       migrations: [__dirname + 'database/migrations/**/*{.ts,.js}'],
   
     }),
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true },
+      interceptor: { mount: false },
+    }),
+    AuthModule,
+    KeycloakModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

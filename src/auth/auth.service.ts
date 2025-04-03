@@ -1,83 +1,113 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RegisterDto } from './dto/register.dto';
-import { keycloakResponse, LoginDto, LoginResponse } from './dto/login.dto';
+import { DecodedToken, keycloakResponse, LoginDto, LoginResponse } from './dto/login.dto';
 import { ClsService } from 'nestjs-cls';
 import * as jwt from 'jsonwebtoken';
 import { decode } from 'punycode';
 import { HttpService } from '@nestjs/axios';
 import { catchError, firstValueFrom } from 'rxjs';
+import { UserService } from '../modules/user/user.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly configService: ConfigService,
-    private readonly clsService: ClsService,
+    private readonly userService:UserService,
     private readonly httpService: HttpService,
   ) {}
 
-  async register(user: RegisterDto) {
+  async register(user: RegisterDto): Promise<string> {
     try {
       const adminToken = await this.getAdminToken();
-      const response = await firstValueFrom(this.httpService.post<any>(
-        `${process.env.KEYCLOAK_AUTH_SERVER_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users`,
-        {
-          username: user.username,
-          email: user.email,
-          enabled: true,
-          credentials: [
+      const response = await firstValueFrom(
+        this.httpService
+          .post<any>(
+            `${process.env.KEYCLOAK_AUTH_SERVER_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users`,
             {
-              type: 'password',
-              value: user.password,
-              temporary: false,
+              username: user.username,
+              email: user.email,
+              enabled: true,
+              emailVerified: true, // Isso deve ser usado apenas em TESTES
+              credentials: [
+                {
+                  type: 'password',
+                  value: user.password,
+                  temporary: false,
+                },
+              ],
             },
-          ],          
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      ).pipe(catchError((error) => {throw error}))
-    );
-    
+            {
+              headers: {
+                Authorization: `Bearer ${adminToken}`,
+                'Content-Type': 'application/json',
+              },
+            },
+          )
+          .pipe(
+            catchError((error) => {
+              throw error;
+            }),
+          ),
+      );
 
-      return { success: true, message: 'Usuário registrado com sucesso' };
+      const locationHeader = response.headers.location;
+      const userId = locationHeader.split('/').pop();
+      const userInfo = await firstValueFrom(
+        this.httpService
+          .get<any>(
+            `${process.env.KEYCLOAK_AUTH_SERVER_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${adminToken}`,
+                'Content-Type': 'application/json',
+              },
+            },
+          )
+          .pipe(
+            catchError((error) => {
+              throw error;
+            }),
+          ),
+      );
+
+      return userInfo.data.sub;
     } catch (error) {
-      return {
-        success: false,
-        message: 'Erro ao registrar usuário',
-        error: error.response?.data || error.message,
-      };
+      throw new HttpException(
+        error.response?.data || error.message,
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
-  async login(credentials: LoginDto):Promise<LoginResponse|any> {
+  async login(credentials: LoginDto): Promise<LoginResponse | any> {
     try {
       const { data } = await firstValueFrom(
-        this.httpService.post<keycloakResponse>(
-          `${process.env.KEYCLOAK_AUTH_SERVER_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/token`,
-          new URLSearchParams({
-            client_id: process.env.KEYCLOAK_CLIENT_ID || '',
-            client_secret: process.env.KEYCLOAK_SECRET || '',
-            grant_type: 'password',
-            username: credentials.username,
-            password: credentials.password,
-          }),
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
+        this.httpService
+          .post<keycloakResponse>(
+            `${process.env.KEYCLOAK_AUTH_SERVER_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/token`,
+            new URLSearchParams({
+              client_id: process.env.KEYCLOAK_CLIENT_ID || '',
+              client_secret: process.env.KEYCLOAK_SECRET || '',
+              grant_type: 'password',
+              username: credentials.username,
+              password: credentials.password,
+            }),
+            {
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
             },
-          },
-        ).pipe(catchError((error) => {throw error})),
+          )
+          .pipe(
+            catchError((error) => {
+              throw error;
+            }),
+          ),
       );
 
-      const decoded = jwt.decode(data.access_token) as any;
-      this.clsService.set('user', {
-        decoded,
-        resource_access: decoded.resource_access,
-      });
+      const decoded = jwt.decode(data.access_token) as DecodedToken;
+      await this.userService.loginUser(decoded.sub);
 
       return {
         success: true,
@@ -96,21 +126,29 @@ export class AuthService {
 
   async refreshToken(token: string) {
     try {
-      const {data} = await firstValueFrom(this.httpService.post<keycloakResponse>(
-        `${process.env.KEYCLOAK_AUTH_SERVER_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/token`,
-        new URLSearchParams({
-          client_id: process.env.KEYCLOAK_CLIENT_ID || '',
-          client_secret: process.env.KEYCLOAK_SECRET || '',
-          grant_type: 'refresh_token',
-          refresh_token: token,
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        },
-      ).pipe(catchError((error) => {throw error})));
-      console.log(data)
+      const { data } = await firstValueFrom(
+        this.httpService
+          .post<keycloakResponse>(
+            `${process.env.KEYCLOAK_AUTH_SERVER_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/token`,
+            new URLSearchParams({
+              client_id: process.env.KEYCLOAK_CLIENT_ID || '',
+              client_secret: process.env.KEYCLOAK_SECRET || '',
+              grant_type: 'refresh_token',
+              refresh_token: token,
+            }),
+            {
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+            },
+          )
+          .pipe(
+            catchError((error) => {
+              throw error;
+            }),
+          ),
+      );
+      console.log(data);
 
       return {
         success: true,
@@ -144,8 +182,7 @@ export class AuthService {
         },
       );
 
-      this.clsService.get('user');
-      this.clsService.set('user', undefined);
+      this.userService.destroy();
 
       return { success: true, message: 'Logout realizado com sucesso' };
     } catch (error) {
@@ -157,28 +194,91 @@ export class AuthService {
     }
   }
 
+  async updateUser(userId: string, updateData: Partial<RegisterDto>): Promise<void> {
+    try {
+        const adminToken = await this.getAdminToken();
+        await firstValueFrom(
+            this.httpService.put(
+                `${process.env.KEYCLOAK_AUTH_SERVER_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}`,
+                updateData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${adminToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                },
+            ).pipe(
+                catchError((error) => {
+                    throw error;
+                }),
+            )
+        );
+    } catch (error) {
+        throw new HttpException(
+            error.response?.data || error.message,
+            HttpStatus.BAD_REQUEST,
+        );
+    }
+}
+
+async softDeleteUser(userId: string): Promise<void> {
+  try {
+      const adminToken = await this.getAdminToken();
+      await firstValueFrom(
+          this.httpService.put(
+              `${process.env.KEYCLOAK_AUTH_SERVER_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}`,
+              {
+                  enabled: false,
+              },
+              {
+                  headers: {
+                      Authorization: `Bearer ${adminToken}`,
+                      'Content-Type': 'application/json',
+                  },
+              },
+          ).pipe(
+              catchError((error) => {
+                  throw error;
+              }),
+          )
+      );
+  } catch (error) {
+      throw new HttpException(
+          error.response?.data || error.message,
+          HttpStatus.BAD_REQUEST,
+      );
+  }
+}
+
   private async getAdminToken() {
     try {
-      const response = await this.httpService.post(
-        `${process.env.KEYCLOAK_AUTH_SERVER_URL}/realms/master/protocol/openid-connect/token`,
-        new URLSearchParams({
-          client_id: 'admin-cli',
-          username: process.env.KEYCLOAK_ADMIN || '',
-          password: process.env.KEYCLOAK_ADMIN_PASSWORD || '',
-          grant_type: 'password',
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        },
+      const response = await firstValueFrom(
+        this.httpService
+          .post(
+            `${process.env.KEYCLOAK_AUTH_SERVER_URL}/realms/master/protocol/openid-connect/token`,
+            new URLSearchParams({
+              client_id: 'admin-cli',
+              username: process.env.KEYCLOAK_ADMIN || '',
+              password: process.env.KEYCLOAK_ADMIN_PASSWORD || '',
+              grant_type: 'password',
+            }),
+            {
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+            },
+          )
+          .pipe(
+            catchError((error) => {
+              throw error;
+            }),
+          ),
       );
 
-      return 'response.data.access_token';
+      return response.data.access_token;
     } catch (error) {
       throw new Error(`Erro ao obter token de admin: ${error.message}`);
     }
   }
 }
-
 

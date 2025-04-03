@@ -11,10 +11,10 @@ import { ApiResponse } from '@nestjs/swagger';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('register')
-  async register(@Body()registerDto: RegisterDto) {
-    return await this.authService.register(registerDto);
-  }
+  // @Post('register')
+  // async register(@Body()registerDto: RegisterDto) {
+  //   return await this.authService.register(registerDto);
+  // }
 
   @Post('login')
   @ApiResponse({ status: 200, description: 'Login realizado com sucesso', type: LoginResponse }) 

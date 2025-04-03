@@ -32,3 +32,28 @@ export interface keycloakResponse {
   refresh_token: string;
   expires_in: number;
 }
+
+export interface DecodedToken {
+  exp: number;
+  iat: number;
+  jti: string;
+  iss: string;
+  aud: string;
+  sub: string;
+  sid: string;
+  typ: string;
+  azp: string;
+  session_state: string;
+  acr: string;
+  realm_access: {
+    roles: string[];
+  };
+  resource_access: {
+    [key: string]: {
+      roles: string[];
+    };
+  };
+  scope: string;
+  email_verified: boolean;
+  preferred_username: string;
+}
