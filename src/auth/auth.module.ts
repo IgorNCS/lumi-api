@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { AuthController } from './auth.controller';
@@ -9,7 +9,7 @@ import { UserModule } from '../modules/user/user.module';
   imports: [
     HttpModule,
     ConfigModule,
-    UserModule
+    forwardRef(() => UserModule)
   ],
   controllers: [AuthController],
   providers: [AuthService],

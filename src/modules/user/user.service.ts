@@ -1,5 +1,7 @@
 import {
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -20,6 +22,7 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private modelRepository: Repository<User>,
+    @Inject(forwardRef(() => AuthService))
     private authService: AuthService,
     private readonly clsService: ClsService,
   ) {}
