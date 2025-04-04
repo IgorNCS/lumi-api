@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { ClsModule } from 'nestjs-cls';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserModule } from './modules/user/user.module';
+import { CompanyModule } from './modules/company/company.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { UserModule } from './modules/user/user.module';
     }),
     AuthModule,
     KeycloakModule,
+    CompanyModule,
     UserModule,
   ],
   controllers: [AppController],

@@ -78,6 +78,7 @@ export class UserService {
         where: where,
         take: limit,
         skip: skip,
+        relations: ['companies'],
       };
 
       const [result, total] =
@@ -108,7 +109,7 @@ export class UserService {
         if (userLogged.role !== Role.ADMIN && updateUserDto.role)
           delete updateUserDto.role;
 
-        const user = await this.findOneById(id);
+        const user = await this.getById(id);
         await this.authService.updateUser(user.keycloakId, updateUserDto);
         const result = await manager.update(
           this.modelRepository.target,
@@ -119,7 +120,7 @@ export class UserService {
           throw new InternalServerErrorException(
             'Falha ao atualizar usuário no banco de dados',
           );
-        return await this.findOneById(id);
+        return await this.getById(id);
       });
     } catch (error) {
       throw error;
@@ -137,7 +138,7 @@ export class UserService {
           );
         }
 
-        const user = await this.findOneById(id);
+        const user = await this.getById(id);
         await this.authService.softDeleteUser(user.keycloakId);
         await manager.softDelete(this.modelRepository.target, id);
       });
@@ -146,7 +147,7 @@ export class UserService {
     }
   }
 
-  async findOneById(id: string): Promise<User> {
+  async getById(id: string): Promise<User> {
     const user = await this.modelRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -156,7 +157,7 @@ export class UserService {
     return user;
   }
 
-  get() {
+  get(): User {
     try {
       const user = this.clsService.get('user');
       if (!user) throw new NotFoundException('User not found');
@@ -166,7 +167,7 @@ export class UserService {
     }
   }
 
-  getAdmin() {
+  getAdmin():User {
     try {
       const user = this.clsService.get('user');
       if (!user) throw new NotFoundException('User not found');
@@ -193,7 +194,7 @@ export class UserService {
     }
   }
 
-  private calculateSkip(page: number, limit: number): number {
+  calculateSkip(page: number, limit: number): number {
     return (page - 1) * limit;
   }
 }

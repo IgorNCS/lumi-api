@@ -18,8 +18,8 @@ describe('UserService', () => {
   let authService: AuthService;
   let clsService: ClsService;
 
-  const mockUser = { id: '1', name: 'Test User', email: 'test@example.com', role: Role.COSTUMER, keycloakId: '123', createdAt: new Date(), updatedAt: new Date(), deletedAt: null };
-  const mockAdmin = { id: '1', name: 'Test User', email: 'test@example.com', role: Role.ADMIN, keycloakId: '123', createdAt: new Date(), updatedAt: new Date(), deletedAt: null };
+  const mockUser = { id: '1', name: 'Test User', email: 'test@example.com', role: Role.COSTUMER, keycloakId: '123', createdAt: new Date(), updatedAt: new Date(), deletedAt: null,companies: [], ownerCompanies: [] };
+  const mockAdmin = { id: '1', name: 'Test User', email: 'test@example.com', role: Role.ADMIN, keycloakId: '123', createdAt: new Date(), updatedAt: new Date(), deletedAt: null,companies:[], ownerCompanies: [] };
   const mockUserRepository = () => ({
     manager: { transaction: jest.fn() },
     save: jest.fn(),
@@ -130,6 +130,7 @@ describe('UserService', () => {
         },
         take: query.limit,
         skip: 0,
+        relations: ['companies'],
       });
 
       expect(result).toEqual({
@@ -228,14 +229,14 @@ describe('UserService', () => {
     })
   });
 
-  describe('findOneById', () => {
+  describe('getById', () => {
     it('should find a user by id', async () => {
       const id = '1';
       const user: User = mockUser;
 
       (userRepository.findOne as jest.Mock).mockResolvedValue(user);
 
-      const result = await service.findOneById(id);
+      const result = await service.getById(id);
 
       expect(result).toEqual(user);
     });
@@ -245,7 +246,7 @@ describe('UserService', () => {
 
       (userRepository.findOne as jest.Mock).mockResolvedValue(undefined);
 
-      await expect(service.findOneById(id)).rejects.toThrow(NotFoundException);
+      await expect(service.getById(id)).rejects.toThrow(NotFoundException);
     });
   });
 

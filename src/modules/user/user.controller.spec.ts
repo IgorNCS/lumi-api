@@ -15,12 +15,12 @@ describe('UserController', () => {
   const mockUserService = () => ({
     create: jest.fn(),
     findAll: jest.fn(),
-    findOneById: jest.fn(),
+    getById: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
   });
 
-  const mockUser: User = { id: '1', name: 'Test User', email: 'test@example.com', role: Role.COSTUMER, keycloakId: '123', createdAt: new Date(), updatedAt: new Date(), deletedAt: null };
+  const mockUser: User = { id: '1', name: 'Test User', email: 'test@example.com', role: Role.COSTUMER, keycloakId: '123', createdAt: new Date(), updatedAt: new Date(), deletedAt: null,companies: [], ownerCompanies: [] };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -68,11 +68,11 @@ describe('UserController', () => {
     it('should find a user by id', async () => {
       const id = '1';
 
-      (userService.findOneById as jest.Mock).mockResolvedValue(mockUser);
+      (userService.getById as jest.Mock).mockResolvedValue(mockUser);
 
       const result = await controller.findOne(id);
 
-      expect(userService.findOneById).toHaveBeenCalledWith(id);
+      expect(userService.getById).toHaveBeenCalledWith(id);
       expect(result).toEqual(mockUser);
     });
   });
