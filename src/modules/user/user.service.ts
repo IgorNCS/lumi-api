@@ -156,7 +156,7 @@ export class UserService {
     return user;
   }
   getBySub(sub: string) {
-    const user = this.modelRepository.findOne({ where: { keycloakId: sub } });
+    const user = this.modelRepository.findOne({ where: { keycloakId: sub },relations: ['companies'] });
     return user;
   }
 

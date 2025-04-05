@@ -8,10 +8,12 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
+import { Invoice } from '../../invoice/entities/invoice.entity';
 
 @Entity()
 export class Company {
@@ -60,6 +62,9 @@ export class Company {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'owner_id' })
   owner: User;
+
+  @OneToMany(() => Invoice, (invoice) => invoice.company)
+  companyInvoices: Invoice[];
 
   @CreateDateColumn()
   @ApiProperty({ example: '2025-02-20T14:30:00.000Z' })

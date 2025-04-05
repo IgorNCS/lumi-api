@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Company } from '../../company/entities/company.entity';
+import { Invoice } from '../../invoice/entities/invoice.entity';
 
 export enum Role {
   ADMIN = 'admin',
@@ -45,6 +46,12 @@ export class User {
     (company) => company.owner,
   )
   ownerCompanies: Company[];
+
+  @OneToMany(
+    () => Invoice,
+    (invoice) => invoice.user,
+  )
+  userInvoices: Invoice[];
 
   @CreateDateColumn()
   @ApiProperty({ example: '2025-02-20T14:30:00.000Z' })

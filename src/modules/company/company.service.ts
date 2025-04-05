@@ -64,8 +64,12 @@ export class CompanyService {
         userIds,
       } = query;
       const where: any = {};
-      if (initialDate && finalDate)
-        where.createdAt = Between(initialDate, finalDate);
+      if (initialDate && finalDate){
+        where.createdAt = Between(
+          new Date(new Date(initialDate).setHours(0, 0, 0, 0)).toISOString(),
+          new Date(new Date(finalDate).setHours(23, 59, 59, 999)).toISOString()
+        );
+      }
       if (name) where.name = Like(`%${name}%`);
       if (cnpj) where.cnpj = Like(`%${cnpj}%`);
       if (address) where.address = Like(`%${address}%`);
