@@ -53,25 +53,7 @@ export class AuthService {
 
       const locationHeader = response.headers.location;
       const userId = locationHeader.split('/').pop();
-      const userInfo = await firstValueFrom(
-        this.httpService
-          .get<any>(
-            `${process.env.KEYCLOAK_AUTH_SERVER_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${adminToken}`,
-                'Content-Type': 'application/json',
-              },
-            },
-          )
-          .pipe(
-            catchError((error) => {
-              throw error;
-            }),
-          ),
-      );
-
-      return userInfo.data.sub;
+      return userId
     } catch (error) {
       throw new HttpException(
         error.response?.data || error.message,
@@ -107,8 +89,7 @@ export class AuthService {
       );
 
       const decoded = jwt.decode(data.access_token) as DecodedToken;
-      await this.userService.loginUser(decoded.sub);
-
+      const user=await this.userService.loginUser(decoded.sub);
       return {
         success: true,
         access_token: data.access_token,
@@ -148,7 +129,6 @@ export class AuthService {
             }),
           ),
       );
-      console.log(data);
 
       return {
         success: true,

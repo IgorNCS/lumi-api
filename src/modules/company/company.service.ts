@@ -78,7 +78,7 @@ export class CompanyService {
       if (cep) where.cep = Like(`%${cep}%`);
 
       if (user.role == Role.COSTUMER) {
-        where.users = user;
+        where.users = { id: In([user.id]) };
       } else if (user.role == Role.ADMIN && userIds) {
         where.users = { id: In(userIds) };
       }
@@ -91,7 +91,7 @@ export class CompanyService {
         where: where,
         take: limit,
         skip: skip,
-        relations: ['owner', 'users'],
+        relations: ['owner', 'users','companyInvoices'],
       };
       const [result, total] =
         await this.modelRepository.findAndCount(findOptions);
@@ -110,7 +110,7 @@ export class CompanyService {
 
   async findOne(id: string): Promise<Company> {
     try {
-      const userLogged:User = this.userService.get();
+      const userLogged:User = await this.userService.get();
       const company = await this.modelRepository.findOne({
         where: { id },
         relations: ['owner', 'users'],

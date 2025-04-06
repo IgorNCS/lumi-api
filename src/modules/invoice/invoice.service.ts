@@ -8,7 +8,7 @@ import e from 'express';
 import { UserService } from '../user/user.service';
 import { Role, User } from '../user/entities/user.entity';
 import { Invoice } from './entities/invoice.entity';
-import { EnergyData } from './entities/energyData.entity';
+import { EnergyData, EnergyDataType } from './entities/energyData.entity';
 import { HistoryEnergy } from './entities/historyEnergy.entity';
 import {
   Between,
@@ -28,6 +28,8 @@ import {
 } from './interfaces/interfaces';
 import { PaginationInvoiceRequest } from './dto/request/findall-invoice.dto';
 import { InvoiceResponseDTO } from './dto/response/invoice.response.dto';
+import * as path from 'path';
+import { Readable } from 'stream';
 
 @Public()
 @Injectable()
@@ -72,7 +74,11 @@ export class InvoiceService {
           ...new Set([...companiyIds, ...allowedCompanyIds]),
         ]);
       }
-      if (userIds && user.role == Role.ADMIN) where.user = In(userIds);
+      if (userIds && user.role == Role.ADMIN) {
+        where.user = In(userIds);
+      } else if (userIds && user.role == Role.COSTUMER) {
+        where.user = In([user.id]);
+      }
       const skip = this.userService.calculateSkip(page, limit);
 
       const findOptions: FindManyOptions<Invoice> = {
@@ -82,14 +88,7 @@ export class InvoiceService {
         where: where,
         take: limit,
         skip: skip,
-        relations: [
-          'user',
-          'company',
-          'energyEletric',
-          'energySCEE',
-          'compensatedEnergy',
-          'historyEnergy',
-        ],
+        relations: ['user', 'company', 'energyData', 'historyEnergy'],
       };
       const [result, total] =
         await this.modelRepository.findAndCount(findOptions);
@@ -108,17 +107,10 @@ export class InvoiceService {
 
   async findOne(id: string): Promise<Invoice> {
     try {
-      const user: User = this.userService.get();
+      const user: User = await this.userService.get();
       const invoice = await this.modelRepository.findOne({
         where: { id },
-        relations: [
-          'user',
-          'company',
-          'energyEletric',
-          'energySCEE',
-          'compensatedEnergy',
-          'historyEnergy',
-        ],
+        relations: ['user', 'company', 'energyData', 'historyEnergy'],
       });
       const userCompanies = user.companies;
       const allowedCompanyIds = userCompanies.map((company) => company.id);
@@ -136,10 +128,9 @@ export class InvoiceService {
     }
   }
 
-
   async remove(id: string) {
     try {
-      const user: User = this.userService.get();
+      const user: User = await this.userService.get();
       const invoice = await this.modelRepository.findOne({
         where: { id },
         relations: [
@@ -167,20 +158,37 @@ export class InvoiceService {
     }
   }
 
-  async createInvoice(invoiceData: IInvoiceData, user: User, company: Company) {
+  async createInvoice(
+    invoiceData: IInvoiceData,
+    user: User,
+    company: Company,
+    uploadFilePath: string,
+  ) {
     return this.modelRepository.manager.transaction(async (manager) => {
       const invoice = await this.saveInvoice(
         invoiceData,
         user,
         company,
         manager,
+        uploadFilePath,
       );
-      await this.saveEnergyData(invoiceData.energyEletric, invoice, manager);
-      await this.saveEnergyData(invoiceData.energySCEE, invoice, manager);
+      await this.saveEnergyData(
+        invoiceData.energyEletric,
+        invoice,
+        manager,
+        EnergyDataType.energyEletric,
+      );
+      await this.saveEnergyData(
+        invoiceData.energySCEE,
+        invoice,
+        manager,
+        EnergyDataType.energySCEE,
+      );
       await this.saveEnergyData(
         invoiceData.compensatedEnergy,
         invoice,
         manager,
+        EnergyDataType.compensatedEnergy,
       );
       await this.saveHistoryEnergy(invoiceData, invoice, manager);
     });
@@ -191,6 +199,7 @@ export class InvoiceService {
     user: User,
     company: Company,
     manager: EntityManager,
+    uploadFilePath: string,
   ) {
     const invoice = new Invoice();
     invoice.installation = invoiceData.installation;
@@ -203,6 +212,9 @@ export class InvoiceService {
     invoice.band = invoiceData.band;
     invoice.user = user;
     invoice.company = company;
+    invoice.path = uploadFilePath;
+    invoice.name = invoiceData.name;
+    invoice.distributor = invoiceData.distributor;
     return manager.save(invoice);
   }
 
@@ -210,10 +222,12 @@ export class InvoiceService {
     energyData: IEnergyData,
     invoice: Invoice,
     manager: EntityManager,
+    energyDataType: EnergyDataType,
   ) {
     const energy = new EnergyData();
     energy.invoice = invoice;
     energy.quantity = energyData.quantity;
+    energy.energyDataType = energyDataType;
     energy.value = energyData.value;
     energy.unitPrice = energyData.unitPrice;
     return manager.save(energy);
@@ -239,14 +253,18 @@ export class InvoiceService {
       const company = user.companies.find(
         (company) => company.id === companyId,
       );
+      if (!company) throw new NotFoundException('Company not found');
       if (!company && user.role !== Role.ADMIN) {
         throw new NotFoundException('Company not found');
       }
       user.companies.find((company) => company.id === companyId);
 
-      const text = await this.extractTextFromPDF(file.buffer);
+      const { text, uploadFilePath } = await this.extractTextFromPDF(
+        file.buffer,
+      );
+
       const invoiceData = this.parseInvoiceData(text);
-      console.log(invoiceData);
+      this.createInvoice(invoiceData, user, company, uploadFilePath);
       return invoiceData;
     } catch (error) {
       console.error('Erro ao ler o PDF:', error);
@@ -254,18 +272,20 @@ export class InvoiceService {
     }
   }
 
-  private async extractTextFromPDF(buffer: Buffer): Promise<string> {
+  private async extractTextFromPDF(buffer: Buffer) {
     const data = await pdf(buffer);
+    const uploadFilePath = `./uploads/${Date.now()}.pdf`;
+    fs.writeFileSync(uploadFilePath, buffer);
+    let text;
     if (!data.text) {
-      const tempFilePath = `/tmp/${Date.now()}.pdf`;
-      fs.writeFileSync(tempFilePath, buffer);
-      const { text } = await new Tesseract(tempFilePath, 'por', {
+      const { text: t } = await new Tesseract(uploadFilePath, 'por', {
         psm: 11,
       });
-      fs.unlinkSync(tempFilePath);
-      return text;
+      text = t;
+    } else {
+      text = data.text;
     }
-    return data.text;
+    return { text, uploadFilePath };
   }
 
   private parseInvoiceData(text: string): IInvoiceData {
@@ -276,6 +296,20 @@ export class InvoiceService {
     const client = this.extractSingleValue(
       text,
       /Nº DO CLIENTE[\s\S]*?(\d+\n)/,
+    );
+    let name = this.extractSingleValue(
+      text,
+      /AutomáticoInstalaçãoVencimentoTotal.*?\n.*?\n.*?\n(.*?)(?:\n|$)/,
+    );
+    if (name == 'ATENÇÃO:') {
+      name = this.extractSingleValue(
+        text,
+        /AutomáticoInstalaçãoVencimentoTotal.*?\n.*?\n.*?\n.*?\n.*?\n(.*?)(?:\n|$)/,
+      );
+    }
+    const distributor = this.extractSingleValue(
+      text,
+      /DOCUMENTO AUXILIAR DA NOTA FISCAL DE ENERGIA ELÉTRICA ELETRÔNICASEGUNDA VIA\n(.*?)(?:\n|$)/,
     );
     const band = this.extractSingleValue(text, /Band\. (\w+)/);
     const dueDate = this.extractSingleValue(
@@ -323,6 +357,8 @@ export class InvoiceService {
     return {
       installation,
       client,
+      name,
+      distributor,
       dueDate,
       totalAmount,
       energyEletric,
@@ -402,5 +438,39 @@ export class InvoiceService {
       }
     }
     return bestCategory;
+  }
+
+  async dowloadFile(id: string): Promise<Readable> {
+    try {
+      const user = await this.userService.get();
+      const invoice = await this.modelRepository.findOne({
+        where: { id },
+        relations: ['company'],
+      });
+      if (
+        !invoice ||
+        !user.companies.some((company) => company.id === invoice.company.id)
+      ) {
+        throw new NotFoundException('Invoice not found');
+      }
+
+      const filePath = invoice.path;
+
+      if (!filePath) {
+        throw new NotFoundException('File not found');
+      }
+
+      const fileBuffer = fs.readFileSync(filePath);
+
+      const readableStream = new Readable();
+      readableStream._read = () => {};
+      readableStream.push(fileBuffer);
+      readableStream.push(null);
+
+      return readableStream;
+    } catch (error) {
+      console.error(`Erro ao baixar a fatura ${id}:`, error);
+      throw error;
+    }
   }
 }

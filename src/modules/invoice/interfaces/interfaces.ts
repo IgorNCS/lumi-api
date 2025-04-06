@@ -13,6 +13,8 @@ export interface IHistoryEnergy {
 export interface IInvoiceData {
   installation: string;
   client: string;
+  name:string;
+  distributor:string;
   dueDate: string;
   totalAmount: number;
   energyEletric: IEnergyData;

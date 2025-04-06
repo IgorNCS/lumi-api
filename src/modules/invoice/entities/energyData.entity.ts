@@ -5,10 +5,7 @@ import {
   DeleteDateColumn,
   Entity,
   JoinColumn,
-  ManyToMany,
   ManyToOne,
-  OneToMany,
-  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -30,9 +27,6 @@ export class EnergyData {
   energyDataType: EnergyDataType;
 
   @Column('decimal', { precision: 10, scale: 4 })
-  totalAmount: number;
-
-  @Column('decimal', { precision: 10, scale: 4 })
   quantity: number;
 
   @Column('decimal', { precision: 10, scale: 4 })
@@ -41,9 +35,7 @@ export class EnergyData {
   @Column('decimal', { precision: 10, scale: 8 })
   unitPrice: number;
 
-  @Column('uuid', { unique: true, nullable: false })
-  @ApiProperty({ example: 'e7d3c6c4-3b6d-4e7a-9eae-64c93f9f7f4f' })
-  @OneToOne(() => Invoice)
+  @ManyToOne(() => Invoice, (invoice) => invoice.energyData)
   @JoinColumn({ name: 'invoice_id' })
   invoice: Invoice;
 
@@ -53,3 +45,4 @@ export class EnergyData {
 
   //   historicoConsumo
 }
+

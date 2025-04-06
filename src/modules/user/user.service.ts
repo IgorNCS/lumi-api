@@ -102,7 +102,7 @@ export class UserService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     try {
       return this.modelRepository.manager.transaction(async (manager) => {
-        const userLogged = this.get();
+        const userLogged = await this.get();
 
         if (userLogged.id !== id && userLogged.role !== Role.ADMIN)
           throw new ForbiddenException(
@@ -133,7 +133,7 @@ export class UserService {
   async remove(id: string): Promise<void> {
     try {
       await this.modelRepository.manager.transaction(async (manager) => {
-        const userLogged = this.get();
+        const userLogged = await this.get();
 
         if (userLogged.id !== id && userLogged.role !== Role.ADMIN) {
           throw new ForbiddenException(
@@ -160,11 +160,13 @@ export class UserService {
     return user;
   }
 
-  get(): User {
+  async get(): Promise<User> {
     try {
-      const user = this.clsService.get('user');
+      const user = await this.clsService.get('user');
       if (!user) throw new NotFoundException('User not found');
-      return user;
+      const userSaved = await this.modelRepository.findOne({ where: { keycloakId: user.sub },relations: ['companies'] });
+      if (!userSaved) throw new NotFoundException('User not found');
+      return userSaved;
     } catch (error) {
       throw error;
     }

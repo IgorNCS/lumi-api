@@ -4,11 +4,13 @@ import { CreateUserDto } from './dto/request/create-user.dto';
 import { UpdateUserDto } from './dto/request/update-user.dto';
 import { PaginationUserRequest } from './dto/request/findall-user.dto';
 import { UserResponseDTO } from './dto/response/user.response.dto';
+import { Public } from 'nest-keycloak-connect';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @Public()
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);

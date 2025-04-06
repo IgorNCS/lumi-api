@@ -6,6 +6,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -65,33 +66,32 @@ export class Invoice {
   @ApiProperty({ type: () => Company })
   company: Company;
 
-  @OneToOne(() => EnergyData, (energyData) => energyData.invoice, {
+
+  @OneToMany(() => EnergyData, (energyData) => energyData.invoice, {
     cascade: true,
     onDelete: 'CASCADE',
   })
   @ApiProperty({ type: () => EnergyData })
-  energyEletric: EnergyData;
+  energyData: EnergyData;
 
-  @OneToOne(() => EnergyData, (energyData) => energyData.invoice, {
-    cascade: true,
-    onDelete: 'CASCADE',
-  })
-  @ApiProperty({ type: () => EnergyData })
-  energySCEE: EnergyData;
 
-  @OneToOne(() => EnergyData, (energyData) => energyData.invoice, {
-    cascade: true,
-    onDelete: 'CASCADE',
-  })
-  @ApiProperty({ type: () => EnergyData })
-  compensatedEnergy: EnergyData;
-
-  @OneToOne(() => HistoryEnergy, (historyEnergy) => historyEnergy.invoice, {
+  @OneToMany(() => HistoryEnergy, (historyEnergy) => historyEnergy.invoice, {
     cascade: true,
     onDelete: 'CASCADE',
   })
   @ApiProperty({ type: () => HistoryEnergy })
   historyEnergy: HistoryEnergy;
+
+  @Column()
+  path:string;
+
+  @Column()
+  @ApiProperty({ example: 'JOSE MESALY FONSECA DE CARVALHO' })
+  name:string
+
+  @Column({default: 'CEMIG'})
+  @ApiProperty({ example: 'CEMIG' })
+  distributor:string
 
   @CreateDateColumn()
   @ApiProperty({ example: '2025-02-20T14:30:00.000Z' })

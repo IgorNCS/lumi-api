@@ -45,7 +45,10 @@ export class Company {
   @ApiProperty({ example: '01234-000' })
   cep: string;
 
-  @ManyToMany(() => User, (user) => user.companies)
+  @ManyToMany(() => User, (user) => user.companies, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   @JoinTable({
     name: 'company_user',
     joinColumn: {
@@ -58,7 +61,7 @@ export class Company {
     },
   })
   users: User[];
-
+  
   @ManyToOne(() => User)
   @JoinColumn({ name: 'owner_id' })
   owner: User;
@@ -78,3 +81,4 @@ export class Company {
   @ApiProperty({ example: '2025-02-24T14:30:00.000Z', nullable: true })
   deletedAt: Date | null;
 }
+
